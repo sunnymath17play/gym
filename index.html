@@ -120,19 +120,13 @@ function getMeiyuFee(date, purchases) {
   const plan = PLANS.find(p => p.id === valid[0].planId);
   return plan ? plan.meiyuFee : 1450;
 }
-// 舊版後端（Apps Script）：只在第一次搬家時讀一次，搬完就停用
-const OLD_API_URL = "https://script.google.com/macros/s/AKfycbyT5c1Vis5vgTpp0vz_A_oLVU0ahJx3ChXdHxmhRooRzBomW6m0PX6KIbI0gnt91FGHXg/exec";
 function stateDoc(){ return window.GYM.db.collection("gym").doc("state"); }
 async function fetchData() {
   // 讀不到就丟錯，不可以用空資料頂替（否則下一次儲存會把雲端資料蓋掉）
+  // 2026-09-27 已從舊 Apps Script 搬完資料，舊後端已封存
   const snap = await stateDoc().get();
-  if (snap.exists) return JSON.parse(snap.data().value);
-  // 第一次：從舊後端搬資料過來
-  const res = await fetch(OLD_API_URL + "?key=" + DATA_KEY);
-  const old = await res.json();
-  if (!old || !Array.isArray(old.sessions)) throw new Error("舊資料格式不對，先不要搬");
-  await stateDoc().set({ value: JSON.stringify(old), updatedAt: new Date().toISOString(), by: window.GYM.user.email, migratedFrom: "apps-script" });
-  return old;
+  if (!snap.exists) throw new Error("雲端找不到健身資料");
+  return JSON.parse(snap.data().value);
 }
 async function pushData(d) {
   try {
