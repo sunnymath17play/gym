@@ -238,7 +238,8 @@ function App() {
       <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 16px 14px",background:"#fff8f0",borderBottom:"1.5px solid #f0dcc8",position:"sticky",top:0,zIndex:50}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:28}}>🏋️</span>
-          <div><div style={{fontSize:18,fontWeight:800,color:"#5c2d00"}}>健身記帳</div><div style={{fontSize:11,color:"#b08060",letterSpacing:1.5,marginTop:1}}>SUNNY · WINNIE · 美玉</div></div>
+          <div><div style={{fontSize:18,fontWeight:800,color:"#5c2d00"}}>健身記帳</div><div style={{fontSize:11,color:"#b08060",letterSpacing:1.5,marginTop:1}}>SUNNY · WINNIE · 美玉</div>
+            {window.GYM.user&&<div onClick={()=>{if(confirm("要登出 "+window.GYM.user.email+" 嗎？\n登出後可以換別的 Google 帳號登入。"))window.GYM.auth.signOut().then(()=>location.reload());}} style={{fontSize:10,color:"#b08060",marginTop:3,cursor:"pointer"}}>👤 {window.GYM.user.email}・<span style={{textDecoration:"underline"}}>登出</span></div>}</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <button onClick={reload} style={{background:"none",border:"1.5px solid #e0c4a8",borderRadius:10,padding:"7px 14px",fontSize:13,color:"#b08060",cursor:"pointer",fontWeight:600}}>{syncing?"⟳ 同步中":"🔄 同步"}</button>
