@@ -66,9 +66,12 @@
     $("gateMsg").textContent=msg||""; $("gateLogin").hidden=!!sw; $("gateSwitch").hidden=!sw;
   }
   window.GYM.showGate=showGate;
+  // iPhone 主畫面圖示開的 App 跳不出 Google 登入視窗（會卡在 firebaseapp.com 白畫面）
+  window.GYM.iosHomeApp = navigator.standalone===true;
   function login(){
     if(!GYM.auth){ $("gateMsg").textContent="連不上網路，請稍後再試"; return; }
     if(/Line\//i.test(navigator.userAgent)){ $("gateMsg").textContent="LINE 裡面不能用 Google 登入，請用 Safari 或 Chrome 開"; return; }
+    if(GYM.iosHomeApp){ $("gateMsg").textContent="主畫面圖示裡不能登入，請用 Safari 打開 sunnymath17play.github.io/gym/ 登入"; return; }
     var p=new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({prompt:"select_account"});
     GYM.auth.signInWithPopup(p).catch(function(e){ if(e&&e.code!=="auth/popup-closed-by-user") $("gateMsg").textContent="登入失敗："+(e.code||e.message); });
   }
@@ -239,7 +242,7 @@ function App() {
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:28}}>🏋️</span>
           <div><div style={{fontSize:18,fontWeight:800,color:"#5c2d00"}}>健身記帳</div><div style={{fontSize:11,color:"#b08060",letterSpacing:1.5,marginTop:1}}>SUNNY · WINNIE · 美玉</div>
-            {window.GYM.user&&<div onClick={()=>{if(confirm("要登出 "+window.GYM.user.email+" 嗎？\n登出後可以換別的 Google 帳號登入。"))window.GYM.auth.signOut().then(()=>location.reload());}} style={{fontSize:10,color:"#b08060",marginTop:3,cursor:"pointer"}}>👤 {window.GYM.user.email}・<span style={{textDecoration:"underline"}}>登出</span></div>}</div>
+            {window.GYM.user&&<div onClick={()=>{if(confirm("要登出 "+window.GYM.user.email+" 嗎？\n登出後可以換別的 Google 帳號登入。"+(window.GYM.iosHomeApp?"\n\n⚠️ 主畫面圖示裡登出後無法直接登入，要改用 Safari 打開才能重新登入。":"")))window.GYM.auth.signOut().then(()=>location.reload());}} style={{fontSize:10,color:"#b08060",marginTop:3,cursor:"pointer"}}>👤 {window.GYM.user.email}・<span style={{textDecoration:"underline"}}>登出</span></div>}</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <button onClick={reload} style={{background:"none",border:"1.5px solid #e0c4a8",borderRadius:10,padding:"7px 14px",fontSize:13,color:"#b08060",cursor:"pointer",fontWeight:600}}>{syncing?"⟳ 同步中":"🔄 同步"}</button>
