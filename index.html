@@ -33,6 +33,7 @@
   #gate p{font-size:14px;color:#8b7f74;line-height:1.6;margin-bottom:18px}
   #gate button{width:100%;font-size:16px;font-weight:700;padding:14px;border-radius:13px;border:none;background:#e8883a;color:#fff;cursor:pointer}
   #gate button.sub{margin-top:10px;background:transparent;color:#8b7f74;border:1.5px solid #ede1d2}
+  #gate input{width:100%;font-size:16px;padding:12px 14px;border:1.5px solid #ede1d2;border-radius:12px;margin-bottom:10px;background:#fff;color:#3d2b1f}
   #gate .msg{margin-top:12px;font-size:13px;color:#cf5a52;min-height:18px;font-weight:600}
 </style>
 </head>
@@ -42,6 +43,11 @@
     <h1>健身記帳</h1>
     <p id="gateText">這是私人紀錄，請先用 Google 帳號登入。</p>
     <button id="gateLogin">用 Google 帳號登入</button>
+    <form id="gatePwForm" hidden>
+      <input id="gateEmail" type="email" placeholder="Email" autocomplete="username" autocapitalize="off"/>
+      <input id="gatePw" type="password" placeholder="密碼" autocomplete="current-password"/>
+      <button type="submit">登入</button>
+    </form>
     <button id="gateSwitch" class="sub" hidden>換一個帳號</button>
     <div class="msg" id="gateMsg"></div>
   </div>
@@ -61,21 +67,57 @@
   };
   function $(id){return document.getElementById(id);}
   window.GYM = {db:null, auth:null, user:null, started:false};
+  // iPhone 主畫面圖示開的 App 跳不出 Google 登入視窗（會卡在 firebaseapp.com 白畫面），
+  // 也拿不到 Safari 的登入，所以改用 email＋密碼登入（密碼要先在 Safari 用 Google 登入後設定）
+  window.GYM.iosHomeApp = navigator.standalone===true;
+  var HOME_TEXT="主畫面 App 請用 email＋密碼登入。\n還沒設密碼的話：先用 Safari 打開 sunnymath17play.github.io/gym/ 用 Google 登入，再點左上角「設定密碼」。";
   function showGate(text,msg,sw){
-    $("gate").hidden=false; $("gateText").textContent=text||"這是私人紀錄，請先用 Google 帳號登入。";
-    $("gateMsg").textContent=msg||""; $("gateLogin").hidden=!!sw; $("gateSwitch").hidden=!sw;
+    $("gate").hidden=false; $("gateText").textContent=text||(GYM.iosHomeApp?HOME_TEXT:"這是私人紀錄，請先用 Google 帳號登入。");
+    $("gateText").style.whiteSpace="pre-line";
+    $("gateMsg").textContent=msg||""; $("gateSwitch").hidden=!sw;
+    $("gateLogin").hidden=!!sw||GYM.iosHomeApp; $("gatePwForm").hidden=!!sw||!GYM.iosHomeApp;
   }
   window.GYM.showGate=showGate;
-  // iPhone 主畫面圖示開的 App 跳不出 Google 登入視窗（會卡在 firebaseapp.com 白畫面）
-  window.GYM.iosHomeApp = navigator.standalone===true;
   function login(){
     if(!GYM.auth){ $("gateMsg").textContent="連不上網路，請稍後再試"; return; }
     if(/Line\//i.test(navigator.userAgent)){ $("gateMsg").textContent="LINE 裡面不能用 Google 登入，請用 Safari 或 Chrome 開"; return; }
-    if(GYM.iosHomeApp){ $("gateMsg").textContent="主畫面圖示裡不能登入，請用 Safari 打開 sunnymath17play.github.io/gym/ 登入"; return; }
     var p=new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({prompt:"select_account"});
     GYM.auth.signInWithPopup(p).catch(function(e){ if(e&&e.code!=="auth/popup-closed-by-user") $("gateMsg").textContent="登入失敗："+(e.code||e.message); });
   }
+  function pwLogin(ev){
+    ev.preventDefault();
+    if(!GYM.auth){ $("gateMsg").textContent="連不上網路，請稍後再試"; return; }
+    var email=$("gateEmail").value.trim(), pw=$("gatePw").value;
+    if(!email||!pw){ $("gateMsg").textContent="請輸入 email 和密碼"; return; }
+    $("gateMsg").textContent="登入中…";
+    GYM.auth.signInWithEmailAndPassword(email,pw).catch(function(e){
+      var c=e&&e.code;
+      $("gateMsg").textContent=
+        (c==="auth/invalid-credential"||c==="auth/wrong-password"||c==="auth/user-not-found"||c==="auth/invalid-email")?"email 或密碼不對。還沒設過密碼的話，請先用 Safari 用 Google 登入後設定。":
+        c==="auth/too-many-requests"?"試太多次了，請過幾分鐘再試":
+        c==="auth/operation-not-allowed"?"密碼登入還沒開啟，請 SUNNY 到 Firebase 主控台開啟":
+        "登入失敗："+(c||e.message);
+    });
+  }
+  // 幫目前的 Google 帳號加一組密碼（同一個帳號，主畫面 App 用）
+  window.GYM.setPassword=function(){
+    var u=GYM.auth&&GYM.auth.currentUser; if(!u) return;
+    var pw=prompt("設定主畫面 App 用的密碼（至少 6 個字）\n帳號："+u.email); if(!pw) return;
+    if(pw.length<6){ alert("密碼至少要 6 個字"); return; }
+    if(prompt("請再輸入一次密碼")!==pw){ alert("兩次輸入的密碼不一樣，請重新設定"); return; }
+    var has=u.providerData.some(function(p){return p.providerId==="password";});
+    (has?u.updatePassword(pw):u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,pw))).then(function(){
+      alert("密碼設好了！\n之後在主畫面熊熊裡，用 "+u.email+" ＋這組密碼登入。");
+    }).catch(function(e){
+      var c=e&&e.code;
+      alert(c==="auth/requires-recent-login"?"為了安全要重新登入一次：請先登出、再用 Google 登入，然後馬上設定密碼。":
+            c==="auth/operation-not-allowed"?"密碼登入還沒開啟，請 SUNNY 到 Firebase 主控台開啟。":
+            c==="auth/weak-password"?"密碼太簡單，請換一組。":
+            "設定失敗："+(c||e.message));
+    });
+  };
   $("gateLogin").addEventListener("click",login);
+  $("gatePwForm").addEventListener("submit",pwLogin);
   $("gateSwitch").addEventListener("click",function(){ GYM.auth.signOut().then(function(){ location.reload(); }); });
   try{
     firebase.initializeApp(CFG);
@@ -242,7 +284,7 @@ function App() {
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:28}}>🏋️</span>
           <div><div style={{fontSize:18,fontWeight:800,color:"#5c2d00"}}>健身記帳</div><div style={{fontSize:11,color:"#b08060",letterSpacing:1.5,marginTop:1}}>SUNNY · WINNIE · 美玉</div>
-            {window.GYM.user&&<div onClick={()=>{if(confirm("要登出 "+window.GYM.user.email+" 嗎？\n登出後可以換別的 Google 帳號登入。"+(window.GYM.iosHomeApp?"\n\n⚠️ 主畫面圖示裡登出後無法直接登入，要改用 Safari 打開才能重新登入。":"")))window.GYM.auth.signOut().then(()=>location.reload());}} style={{fontSize:10,color:"#b08060",marginTop:3,cursor:"pointer"}}>👤 {window.GYM.user.email}・<span style={{textDecoration:"underline"}}>登出</span></div>}</div>
+            {window.GYM.user&&<div style={{fontSize:10,color:"#b08060",marginTop:3}}>👤 {window.GYM.user.email}・<span onClick={()=>{if(confirm("要登出 "+window.GYM.user.email+" 嗎？\n登出後可以換別的帳號登入。"+(window.GYM.iosHomeApp?"\n\n⚠️ 主畫面圖示裡要用 email＋密碼才能重新登入，請確定已經設過密碼。":"")))window.GYM.auth.signOut().then(()=>location.reload());}} style={{textDecoration:"underline",cursor:"pointer"}}>登出</span>・<span onClick={window.GYM.setPassword} style={{textDecoration:"underline",cursor:"pointer"}}>設定密碼</span></div>}</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <button onClick={reload} style={{background:"none",border:"1.5px solid #e0c4a8",borderRadius:10,padding:"7px 14px",fontSize:13,color:"#b08060",cursor:"pointer",fontWeight:600}}>{syncing?"⟳ 同步中":"🔄 同步"}</button>
